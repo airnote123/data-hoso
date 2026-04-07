@@ -1,68 +1,377 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>本文送信テスト</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #f2f2f2;
-    }
-    .box {
-      background: white;
-      width: 300px;
-      margin: 40px auto;
-      padding: 20px;
-      border-radius: 8px;
-    }
-    input, button {
-      width: 100%;
-      padding: 8px;
-      margin-top: 8px;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>委員会データ共有システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Supabase JS Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co"; 
+        const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        const state = {
+            isAdmin: false,
+            activeView: 'api',
+            currentData: null,
+            adminClickCount: 0,
+            adminTimer: null
+        };
+
+        const elements = {
+            viewEditor: document.getElementById('viewEditor'),
+            viewApi: document.getElementById('viewApi'),
+            jsonInput: document.getElementById('jsonInput'),
+            jsonDisplay: document.getElementById('jsonDisplay'),
+            saveBtn: document.getElementById('saveBtn'),
+            toast: document.getElementById('toast'),
+            statusLabel: document.getElementById('statusLabel'),
+            errorMsg: document.getElementById('errorMsg'),
+            dataNoteDisplay: document.getElementById('dataNoteDisplay'),
+            timestampDisplay: document.getElementById('timestampDisplay'),
+            navEditor: document.getElementById('navEditor'),
+            adminSectionTitle: document.getElementById('adminSectionTitle'),
+            sidebarFooter: document.getElementById('sidebarFooter'),
+            passwordModal: document.getElementById('passwordModal'),
+            passwordInput: document.getElementById('passwordInput')
+        };
+
+        async function init() {
+            await loadLatestData();
+            hideAdminControls();
+            switchView('api');
+        }
+
+        async function loadLatestData() {
+            try {
+                const { data, error } = await supabase
+                    .from('jsons')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .single();
+
+                if (error) {
+                    if (error.code === 'PGRST116') {
+                        elements.jsonDisplay.innerHTML = `<span class="text-slate-400">公開データは現在登録されていません。</span>`;
+                        return;
+                    }
+                    throw error;
+                }
+
+                state.currentData = data;
+                elements.jsonInput.value = data.content;
+                document.getElementById('dataNote').value = data.note || '';
+                elements.dataNoteDisplay.innerText = data.note || '（特記事項なし）';
+                elements.timestampDisplay.innerText = "最終更新: " + new Date(data.created_at).toLocaleString('ja-JP');
+                renderApiView();
+            } catch (err) {
+                showToast("データの同期に失敗しました", "error");
+                console.error(err);
+            }
+        }
+
+        function hideAdminControls() {
+            elements.navEditor.classList.add('hidden');
+            elements.adminSectionTitle.classList.add('hidden');
+            elements.sidebarFooter.classList.add('hidden');
+            state.isAdmin = false;
+        }
+
+        function showAdminControls() {
+            elements.navEditor.classList.remove('hidden');
+            elements.adminSectionTitle.classList.remove('hidden');
+            elements.sidebarFooter.classList.remove('hidden');
+            state.isAdmin = true;
+        }
+
+        function handleStatusClick() {
+            clearTimeout(state.adminTimer);
+            state.adminClickCount++;
+            
+            if (state.adminClickCount >= 5) {
+                state.adminClickCount = 0;
+                if (state.isAdmin) {
+                    showToast("管理者権限は有効です", "info");
+                } else {
+                    elements.passwordModal.classList.remove('hidden');
+                    elements.passwordInput.focus();
+                }
+            } else {
+                state.adminTimer = setTimeout(() => {
+                    state.adminClickCount = 0;
+                }, 1000);
+            }
+        }
+
+        function verifyPassword() {
+            if (elements.passwordInput.value === "password") {
+                showAdminControls();
+                showToast("認証に成功しました", "success");
+                closeModal();
+                switchView('editor');
+            } else {
+                showToast("認証に失敗しました", "error");
+                elements.passwordInput.value = "";
+            }
+        }
+
+        function closeModal() {
+            elements.passwordModal.classList.add('hidden');
+            elements.passwordInput.value = "";
+        }
+
+        async function handleSave() {
+            if (!validateAndFormat()) return;
+
+            elements.saveBtn.disabled = true;
+            showToast("保存処理中...", "info");
+
+            try {
+                const { data, error } = await supabase.from('jsons').insert([
+                    { 
+                        content: elements.jsonInput.value, 
+                        note: document.getElementById('dataNote').value 
+                    }
+                ]).select();
+
+                if (error) throw error;
+
+                showToast("正常に保存されました", "success");
+                await loadLatestData();
+                switchView('api');
+            } catch (err) {
+                showToast("保存エラー: " + err.message, "error");
+            } finally {
+                elements.saveBtn.disabled = false;
+            }
+        }
+
+        function switchView(view) {
+            state.activeView = view;
+            const views = ['editor', 'api'];
+            views.forEach(v => {
+                const el = document.getElementById(`view${v.charAt(0).toUpperCase() + v.slice(1)}`);
+                const nav = document.getElementById(`nav${v.charAt(0).toUpperCase() + v.slice(1)}`);
+                if (v === view) {
+                    el.classList.remove('hidden');
+                    nav.classList.add('active-nav');
+                } else {
+                    el.classList.add('hidden');
+                    nav.classList.remove('active-nav');
+                }
+            });
+            if (view === 'api') renderApiView();
+        }
+
+        function validateAndFormat() {
+            const val = elements.jsonInput.value.trim();
+            if (!val) return false;
+            try {
+                const parsed = JSON.parse(val);
+                elements.jsonInput.value = JSON.stringify(parsed, null, 2);
+                elements.errorMsg.classList.add('hidden');
+                return true;
+            } catch (e) {
+                elements.errorMsg.innerText = `JSON形式が正しくありません。`;
+                elements.errorMsg.classList.remove('hidden');
+                return false;
+            }
+        }
+
+        function renderApiView() {
+            const val = elements.jsonInput.value;
+            try {
+                const parsed = JSON.parse(val);
+                elements.jsonDisplay.innerHTML = syntaxHighlight(JSON.stringify(parsed, null, 2));
+            } catch (e) {
+                elements.jsonDisplay.innerHTML = `<span class="text-slate-400">表示可能なデータがありません</span>`;
+            }
+        }
+
+        function syntaxHighlight(json) {
+            json = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            return json.replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, (match) => {
+                let cls = 'text-blue-700'; // 数字
+                if (/^"/.test(match)) {
+                    cls = (/:$/.test(match)) ? 'text-indigo-800 font-medium' : 'text-emerald-700'; // キー vs 文字列
+                } else if (/true|false/.test(match)) {
+                    cls = 'text-amber-700';
+                } else if (/null/.test(match)) {
+                    cls = 'text-slate-400';
+                }
+                return `<span class="${cls}">${match}</span>`;
+            });
+        }
+
+        function showToast(msg, type) {
+            elements.toast.innerText = msg;
+            const bg = type === 'success' ? 'bg-slate-800' : type === 'error' ? 'bg-rose-700' : 'bg-indigo-700';
+            elements.toast.className = `fixed bottom-8 right-8 px-6 py-3 rounded-lg text-white text-sm font-medium shadow-2xl transition-all z-50 ${bg}`;
+            elements.toast.style.transform = 'translateY(0)';
+            elements.toast.style.opacity = '1';
+            setTimeout(() => {
+                elements.toast.style.transform = 'translateY(20px)';
+                elements.toast.style.opacity = '0';
+            }, 3000);
+        }
+
+        window.switchView = switchView;
+        window.handleSave = handleSave;
+        window.handleStatusClick = handleStatusClick;
+        window.formatJson = validateAndFormat;
+        window.verifyPassword = verifyPassword;
+        window.closeModal = closeModal;
+        window.copyPayload = () => {
+            const t = document.createElement('textarea');
+            t.value = elements.jsonInput.value;
+            document.body.appendChild(t);
+            t.select();
+            document.execCommand('copy');
+            document.body.removeChild(t);
+            showToast("JSONデータをクリップボードへコピーしました", "success");
+        };
+        window.createNew = () => {
+            elements.jsonInput.value = "";
+            document.getElementById('dataNote').value = "";
+            switchView('editor');
+        };
+
+        window.addEventListener('load', init);
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Noto+Sans+JP:wght@400;500;700&display=swap');
+        body { font-family: 'Inter', 'Noto Sans JP', sans-serif; background-color: #F8FAFC; color: #334155; }
+        pre, textarea, code { font-family: 'JetBrains Mono', monospace; }
+        .sidebar-nav-item { border-left: 3px solid transparent; transition: all 0.2s; cursor: pointer; color: #64748b; }
+        .sidebar-nav-item:hover { background: #f1f5f9; color: #1e293b; }
+        .active-nav { border-left-color: #059669; background: #f0fdf4; color: #065f46; font-weight: 500; }
+        .bg-grid {
+            background-image: radial-gradient(rgba(148,163,184,0.1) 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+    </style>
 </head>
-<body>
+<body class="h-screen flex overflow-hidden">
 
-<div class="box">
-  <h2>本文送信</h2>
+    <div id="toast" class="opacity-0 pointer-events-none transition-all duration-300"></div>
 
-  <input id="text" placeholder="ここに本文を入力">
-  <button onclick="send()">送信</button>
+    <!-- Password Modal -->
+    <div id="passwordModal" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[100] flex items-center justify-center p-6">
+        <div class="bg-white border border-slate-200 p-8 rounded-xl w-full max-w-sm shadow-2xl">
+            <h3 class="text-slate-900 font-bold mb-4 flex items-center gap-2">
+                <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                管理者認証
+            </h3>
+            <input type="password" id="passwordInput" placeholder="パスワードを入力" class="w-full bg-slate-50 border border-slate-200 p-3 text-slate-900 rounded-lg mb-6 outline-none focus:border-slate-400 transition-all font-mono text-center">
+            <div class="flex gap-2">
+                <button onclick="closeModal()" class="flex-1 py-2.5 text-slate-500 text-sm font-medium hover:text-slate-800 transition">閉じる</button>
+                <button onclick="verifyPassword()" class="flex-1 py-2.5 bg-slate-800 text-white text-sm font-medium rounded-lg hover:bg-slate-700 transition">認証実行</button>
+            </div>
+        </div>
+    </div>
 
-  <p id="status"></p>
-</div>
+    <!-- Sidebar -->
+    <aside class="w-64 bg-white border-r border-slate-200 flex flex-col z-20 shadow-sm">
+        <div class="p-6">
+            <div class="flex items-center gap-3 mb-12">
+                <div class="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center shadow-md">
+                    <svg viewBox="0 0 24 24" class="w-4 h-4 text-white fill-current"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <h1 class="text-sm font-bold tracking-tight text-slate-800 uppercase">Committee Hub</h1>
+            </div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-  const supabase = window.supabase.createClient(
-    "https://speopkpxkpmspuxjgyde.supabase.co",
-    "sb_publishable_ywXntr_4W851vxWRjZ3dPA_uCvLurUu"
-  );
+            <div class="space-y-1">
+                <p class="text-[10px] font-bold text-slate-400 uppercase px-4 mb-3 tracking-[0.15em]">閲覧メニュー</p>
+                <button id="navApi" onclick="switchView('api')" class="sidebar-nav-item w-full flex items-center gap-3 px-4 py-3 text-sm rounded-lg">
+                    <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    最新データの確認
+                </button>
+                
+                <p id="adminSectionTitle" class="text-[10px] font-bold text-slate-400 uppercase px-4 mt-8 mb-3 tracking-[0.15em] hidden">管理者メニュー</p>
+                <button id="navEditor" onclick="switchView('editor')" class="sidebar-nav-item w-full items-center gap-3 px-4 py-3 text-sm rounded-lg hidden">
+                    <svg class="w-4 h-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    データ更新
+                </button>
+            </div>
+        </div>
 
-  async function send() {
-    const text = document.getElementById("text").value;
-    const status = document.getElementById("status");
+        <div id="sidebarFooter" class="mt-auto p-6 border-t border-slate-50 hidden">
+            <button onclick="createNew()" class="w-full py-2 bg-white text-slate-600 hover:bg-slate-50 text-[10px] font-bold rounded-lg border border-slate-200 transition">
+                新規作成
+            </button>
+        </div>
+    </aside>
 
-    if (!text) {
-      status.textContent = "本文を入れてください";
-      return;
-    }
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col min-w-0 bg-[#F8FAFC] bg-grid">
+        <header class="h-14 border-b border-slate-200 flex items-center justify-between px-8 bg-white shadow-sm z-10">
+            <div id="statusLabel" onclick="handleStatusClick()" class="flex items-center gap-2 text-[10px] font-bold tracking-[0.2em] text-slate-500 cursor-pointer select-none hover:text-emerald-600 transition-colors">
+                <span class="w-2 h-2 bg-emerald-500 rounded-full shadow-[0_0_4px_rgba(16,185,129,0.3)]"></span>
+                SYSTEM OPERATING
+            </div>
+            <span id="timestampDisplay" class="text-[10px] text-slate-400 font-medium">--</span>
+        </header>
 
-    status.textContent = "送信中…";
+        <div class="flex-1 overflow-hidden relative p-8">
+            
+            <!-- Editor View -->
+            <div id="viewEditor" class="h-full flex flex-col hidden max-w-5xl mx-auto space-y-6">
+                <div class="flex items-end justify-between border-b border-slate-200 pb-4">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900 tracking-tight">データ更新エディタ</h2>
+                        <p class="text-xs text-slate-500 mt-1">新しい情報を入力して保存すると、全体に反映されます。</p>
+                    </div>
+                    <button id="saveBtn" onclick="handleSave()" class="px-8 py-2.5 bg-emerald-700 text-white text-sm font-medium rounded-lg transition hover:bg-emerald-600 shadow-md">公開する</button>
+                </div>
 
-    const { error } = await supabase
-      .from("messages")
-      .insert([{ text }]);
+                <div id="errorMsg" class="hidden p-3 bg-rose-50 border border-rose-100 rounded-lg text-rose-700 text-xs font-medium font-mono"></div>
 
-    if (error) {
-      status.textContent = "エラー：" + error.message;
-    } else {
-      status.textContent = "保存しました！";
-      document.getElementById("text").value = "";
-    }
-  }
-</script>
+                <div class="grid grid-cols-3 gap-6 flex-1 min-h-0">
+                    <div class="col-span-2 flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="px-4 py-2 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                            <span class="text-[9px] font-bold text-slate-400 tracking-widest uppercase">Payload Body</span>
+                        </div>
+                        <textarea id="jsonInput" placeholder='{"status": "OK"}' 
+                            class="flex-1 w-full bg-transparent p-6 text-sm text-slate-700 outline-none resize-none leading-relaxed font-mono"></textarea>
+                    </div>
+                    <div class="col-span-1 space-y-4">
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                            <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">更新記録用メモ</h3>
+                            <textarea id="dataNote" placeholder="変更の概要など..." 
+                                class="w-full h-40 bg-slate-50 border border-slate-100 p-3 text-xs text-slate-600 rounded-lg outline-none focus:border-slate-300 resize-none transition-all"></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Public View -->
+            <div id="viewApi" class="h-full flex flex-col max-w-5xl mx-auto space-y-6">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-900 tracking-tight">共有中の最新データ</h2>
+                        <div class="flex items-center gap-3 mt-1">
+                            <p id="dataNoteDisplay" class="text-sm text-slate-500"></p>
+                        </div>
+                    </div>
+                    <button onclick="copyPayload()" class="px-5 py-2 text-slate-700 bg-white border border-slate-200 text-xs font-medium rounded-lg transition hover:bg-slate-50 shadow-sm">内容をコピー</button>
+                </div>
+
+                <div class="flex-1 bg-white rounded-2xl border border-slate-200 overflow-hidden flex flex-col shadow-lg relative">
+                    <div class="flex-1 overflow-auto p-10">
+                        <pre id="jsonDisplay" class="text-[14px] leading-relaxed"></pre>
+                    </div>
+                </div>
+                <div class="flex items-center justify-center py-2 opacity-30">
+                    <p class="text-[9px] text-slate-400 font-medium tracking-[0.4em] uppercase">Official Committee Node</p>
+                </div>
+            </div>
+
+        </div>
+    </main>
 
 </body>
 </html>
