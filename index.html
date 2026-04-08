@@ -66,7 +66,7 @@
                 elements.jsonInput.value = data.content;
                 document.getElementById('dataNote').value = data.note || '';
                 elements.dataNoteDisplay.innerText = data.note || '（特記事項なし）';
-                elements.timestampDisplay.innerText = "同期完了: " + new Date(data.created_at).toLocaleString('ja-JP');
+                elements.timestampDisplay.innerText = "最終更新日: " + new Date(data.created_at).toLocaleString('ja-JP');
                 renderApiView();
             } catch (err) {
                 showToast("データの同期に失敗しました", "error");
