@@ -2,51 +2,33 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>放送表示システム</title>
+<title>放送表示</title>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-<script src="https://cdn.tailwindcss.com"></script>
 
-<style>
-.preserve { white-space: pre-wrap; }
-</style>
 </head>
+<body>
 
-<body class="bg-slate-100 p-6">
+<h1>放送内容</h1>
 
-<h1 class="text-2xl font-bold mb-4">放送内容</h1>
-
-<!-- ステータス -->
-<div id="connection" class="text-sm mb-1"></div>
-<div id="status" class="text-sm text-gray-500 mb-1"></div>
-<div id="note" class="text-sm text-blue-600 mb-4"></div>
-
-<!-- 内容 -->
-<div id="list" class="space-y-4"></div>
+<div id="status"></div>
+<div id="note"></div>
+<div id="list"></div>
 
 <script>
-const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+const supabase = window.supabase.createClient(
+  "https://qfzyrogwyjbzbblnvqzy.supabase.co",
+  "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw"
+);
 
-// ===== 接続チェック =====
-const connectionEl = document.getElementById("connection");
-
-if (!window.supabase) {
-  connectionEl.innerText = "❌ Supabase未接続";
-} else {
-  connectionEl.innerText = "🟡 接続確認中...";
-}
-
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// ===== メイン処理 =====
 async function load() {
-  const statusEl = document.getElementById("status");
-  const noteEl = document.getElementById("note");
+  const status = document.getElementById("status");
+  const list = document.getElementById("list");
+  const note = document.getElementById("note");
+
+  status.innerText = "通信中...";
 
   try {
-    statusEl.innerText = "通信中...";
-
     const { data, error } = await supabase
       .from("broadcasts")
       .select("*")
@@ -54,74 +36,52 @@ async function load() {
       .limit(1);
 
     if (error) {
-      connectionEl.innerText = "❌ 接続エラー";
-      statusEl.innerText = error.message;
+      status.innerText = "❌ エラー: " + error.message;
       return;
     }
 
-    connectionEl.innerText = "✅ 接続成功";
-
     if (!data || data.length === 0) {
-      statusEl.innerText = "データなし";
+      status.innerText = "❌ データなし";
       return;
     }
 
     const row = data[0];
 
-    statusEl.innerText =
-      "最終更新: " + new Date(row.created_at).toLocaleString();
+    status.innerText = "✅ 取得成功";
 
-    noteEl.innerText = row.note || "";
+    note.innerText = row.note || "";
 
-    const episodes = JSON.parse(row.content);
+    // ★ここが最重要
+    let episodes;
+    try {
+      episodes = JSON.parse(row.content);
+    } catch (e) {
+      status.innerText = "❌ JSONエラー: " + e.message;
+      return;
+    }
 
-    const list = document.getElementById("list");
     list.innerHTML = "";
 
     episodes.forEach(ep => {
       const div = document.createElement("div");
-      div.className = "bg-white p-4 rounded shadow";
 
       div.innerHTML = `
-        <div class="font-bold">${ep.number} (${ep.date})</div>
-
-        <div class="mt-2">
-          <b>オープニング</b>
-          <p class="preserve">${ep.opening || ""}</p>
-        </div>
-
-        <div class="mt-2">
-          <b>企画</b>
-          <p class="preserve">${ep.trivia || ""}</p>
-        </div>
-
-        <div class="mt-2">
-          <b>エンディング</b>
-          <p class="preserve">${ep.ending || ""}</p>
-        </div>
+        <hr>
+        <b>${ep.number}</b> (${ep.date})<br>
+        【OP】${ep.opening}<br>
+        【企画】${ep.trivia}<br>
+        【ED】${ep.ending}
       `;
 
       list.appendChild(div);
     });
 
   } catch (e) {
-    connectionEl.innerText = "❌ 重大エラー";
-    statusEl.innerText = e.message;
+    status.innerText = "❌ 重大エラー: " + e.message;
   }
 }
 
-// ===== 初回実行 =====
 load();
-
-// ===== リアルタイム更新 =====
-supabase
-  .channel('realtime-broadcasts')
-  .on(
-    'postgres_changes',
-    { event: 'INSERT', schema: 'public', table: 'broadcasts' },
-    () => load()
-  )
-  .subscribe();
 </script>
 
 </body>
