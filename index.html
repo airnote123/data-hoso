@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放送内容報告書</title>
+    <!-- Supabase JS Library -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #f8f9fa;
+            --text-main: #2c3e50;
+            --text-muted: #6c757d;
+            --accent: #2980b9;
+            --border: #dee2e6;
+            --card-bg: #ffffff;
+        }
+
+        body { 
+            font-family: "Helvetica Neue", Arial, "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+            line-height: 1.7; 
+            padding: 40px 20px; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        #status { display: none; }
+
+        header {
+            margin-bottom: 30px;
+            border-bottom: 3px solid var(--text-main);
+            padding-bottom: 10px;
+        }
+
+        h1 { 
+            font-size: 1.6rem; 
+            font-weight: 700;
+            margin: 0;
+            color: var(--text-main);
+        }
+
+        .note-area { 
+            font-size: 0.95rem; 
+            margin-bottom: 30px; 
+            padding: 20px; 
+            background: #fff; 
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            /* 改行を有効にする設定 */
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .note-label {
+            font-size: 0.8rem;
+            color: var(--accent);
+            font-weight: 700;
+            display: block;
+            margin-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        #list {
+            display: flex;
+            flex-direction: column;
+            gap: 25px;
+        }
+
+        .episode-card { 
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            padding: 30px; 
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        
+        .episode-header { 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            border-bottom: 2px solid #f8f9fa;
+            padding-bottom: 15px;
+        }
+
+        .episode-number {
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .episode-date { 
+            color: var(--text-main); 
+            font-size: 1.1rem; 
+            font-weight: 600;
+            background: #e9ecef;
+            padding: 4px 12px;
+            border-radius: 4px;
+        }
+
+        /* カラムがすぐに折れないように調整 */
+        .info-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .info-item {
+            display: flex;
+            border-bottom: 1px solid #fcfcfc;
+            padding-bottom: 10px;
+        }
+
+        .label { 
+            flex: 0 0 100px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            padding-top: 4px;
+        }
+
+        .content { 
+            flex: 1;
+            font-size: 1rem;
+            font-weight: 500;
+            color: var(--text-main);
+            /* 改行を有効にし、勝手に折れすぎないように設定 */
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-width: 0;
+        }
+
+        @media print {
+            body { padding: 0; background: white; }
+            .episode-card { break-inside: avoid; border: 1px solid #333; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="status">Connecting</div>
+
+<header>
+    <h1>放送内容報告書</h1>
+</header>
+
+<div class="note-area">
+    <span class="note-label">連絡事項・備考</span><span id="note">未設定</span>
+</div>
+
+<div id="list"></div>
+
+<script>
+(function() {
+    const initApp = () => {
+        const statusEl = document.getElementById("status");
+        const listEl = document.getElementById("list");
+        const noteEl = document.getElementById("note");
+
+        if (typeof window.supabase === 'undefined') return;
+
+        const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        function render(data) {
+            if (!data || data.length === 0) return;
+
+            const row = data[0];
+            noteEl.innerText = row.note || "（特記なし）";
+
+            let episodes = [];
+            try {
+                episodes = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+            } catch (e) {
+                console.error("JSON parse error:", e);
+                return;
+            }
+            
+            listEl.innerHTML = "";
+            episodes.forEach(ep => {
+                const card = document.createElement("div");
+                card.className = "episode-card";
+                card.innerHTML = `
+                    <div class="episode-header">
+                        <span class="episode-number">放送番号：${ep.number || "未設定"}</span>
+                        <span class="episode-date">${ep.date || "未設定"}</span>
+                    </div>
+                    <div class="info-sections">
+                        <div class="info-item">
+                            <span class="label">【OP】</span>
+                            <span class="content">${ep.opening || "未設定"}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">【企画】</span>
+                            <span class="content">${ep.trivia || "未設定"}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">【ED】</span>
+                            <span class="content">${ep.ending || "未設定"}</span>
+                        </div>
+                    </div>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        async function loadData() {
+            try {
+                const { data, error } = await supabase
+                    .from("broadcasts")
+                    .select("*")
+                    .order("created_at", { ascending: false })
+                    .limit(1);
+
+                if (error) throw error;
+                render(data);
+                statusEl.innerText = "Live";
+            } catch (err) {
+                console.error("Fetch error:", err);
+            }
+        }
+
+        loadData();
+        setInterval(loadData, 1000);
+    };
+
+    if (document.readyState === 'complete') {
+        initApp();
+    } else {
+        window.addEventListener('load', initApp);
+    }
+})();
+</script>
+
+</body>
+</html>
