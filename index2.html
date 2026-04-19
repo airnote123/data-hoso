@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>放送表示（閲覧専用）</title>
+<title>放送表示（リアルタイム）</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -14,37 +14,56 @@
 
 <body class="bg-slate-100 p-6">
 
-<h1 class="text-2xl font-bold mb-6">放送内容</h1>
+<h1 class="text-2xl font-bold mb-4">放送内容</h1>
 
-<div id="status" class="mb-4 text-sm text-gray-500">読み込み中...</div>
+<div id="status" class="text-sm text-gray-500 mb-1">読み込み中...</div>
+<div id="note" class="text-sm text-blue-600 mb-4"></div>
+
 <div id="list" class="space-y-4"></div>
 
 <script>
-// ===== Supabase =====
+// ===== Supabase設定（あなたの値）=====
 const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_xxx";
+const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-// ===== 読み込み =====
+// ===== データ取得 =====
 async function load() {
-  const { data, error } = await supabase
-    .from("jsons")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
+  const status = document.getElementById("status");
+  const noteEl = document.getElementById("note");
 
-  if (error) {
-    document.getElementById("status").innerText = "取得失敗";
-    return;
+  try {
+    const { data, error } = await supabase
+      .from("broadcasts")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      status.innerText = "データがありません";
+      return;
+    }
+
+    const row = data[0];
+
+    // 最終更新
+    status.innerText =
+      "最終更新: " + new Date(row.created_at).toLocaleString();
+
+    // コメント
+    noteEl.innerText = row.note || "";
+
+    // JSON
+    const episodes = JSON.parse(row.content);
+    render(episodes);
+
+  } catch (e) {
+    console.error(e);
+    status.innerText = "エラー: " + e.message;
   }
-
-  document.getElementById("status").innerText =
-    "最終更新: " + new Date(data.created_at).toLocaleString();
-
-  const episodes = JSON.parse(data.content);
-  render(episodes);
 }
 
 // ===== 表示 =====
@@ -57,7 +76,7 @@ function render(episodes) {
     div.className = "bg-white p-4 rounded shadow";
 
     div.innerHTML = `
-      <div class="font-bold text-lg">${ep.number} (${ep.date})</div>
+      <div class="font-bold">${ep.number} (${ep.date})</div>
 
       <div class="mt-2">
         <b>オープニング</b>
@@ -74,11 +93,24 @@ function render(episodes) {
         <p class="preserve">${ep.ending || ""}</p>
       </div>
     `;
+
     list.appendChild(div);
   });
 }
 
-// 初回実行
+// ===== リアルタイム更新 =====
+supabase
+  .channel('realtime-broadcasts')
+  .on(
+    'postgres_changes',
+    { event: 'INSERT', schema: 'public', table: 'broadcasts' },
+    () => {
+      load();
+    }
+  )
+  .subscribe();
+
+// 初回ロード
 load();
 </script>
 
