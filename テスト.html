@@ -1,0 +1,60 @@
+<script>
+const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+async function load() {
+  const status = document.getElementById("status");
+  const noteEl = document.getElementById("note");
+
+  status.innerText = "通信中...";
+
+  try {
+    console.log("①通信開始");
+
+    const { data, error } = await supabase
+      .from("broadcasts")
+      .select("*");
+
+    console.log("②取得結果:", data);
+    console.log("③エラー:", error);
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      status.innerText = "データなし";
+      return;
+    }
+
+    const row = data[0];
+
+    status.innerText = "取得成功";
+
+    noteEl.innerText = row.note || "";
+
+    console.log("④JSON:", row.content);
+
+    const episodes = JSON.parse(row.content);
+
+    render(episodes);
+
+  } catch (e) {
+    console.error("エラー詳細:", e);
+    status.innerText = "エラー: " + e.message;
+  }
+}
+
+function render(episodes) {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  episodes.forEach(ep => {
+    const div = document.createElement("div");
+    div.innerHTML = `<b>${ep.number}</b>`;
+    list.appendChild(div);
+  });
+}
+
+load();
+</script>
