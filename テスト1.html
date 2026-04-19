@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>デバッグ版</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+.preserve { white-space: pre-wrap; }
+</style>
+</head>
+
+<body class="bg-slate-100 p-6">
+
+<h1 class="text-xl font-bold mb-4">デバッグ</h1>
+
+<div id="status" class="mb-2 text-sm"></div>
+<div id="debug" class="text-xs bg-black text-green-400 p-3 rounded whitespace-pre-wrap"></div>
+<div id="list"></div>
+
+<script>
+const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function log(msg) {
+  document.getElementById("debug").innerText += msg + "\n";
+}
+
+async function load() {
+  const status = document.getElementById("status");
+
+  try {
+    status.innerText = "①通信開始";
+    log("①通信開始");
+
+    const { data, error } = await supabase
+      .from("broadcasts")
+      .select("*");
+
+    log("②data: " + JSON.stringify(data));
+    log("③error: " + JSON.stringify(error));
+
+    if (error) throw error;
+
+    if (!data || data.length === 0) {
+      status.innerText = "データなし";
+      return;
+    }
+
+    const row = data[0];
+
+    status.innerText = "④取得成功";
+
+    log("⑤content: " + row.content);
+
+    const episodes = JSON.parse(row.content);
+
+    log("⑥JSON OK");
+
+    render(episodes);
+
+  } catch (e) {
+    status.innerText = "エラー発生";
+    log("❌エラー: " + e.message);
+  }
+}
+
+function render(episodes) {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  episodes.forEach(ep => {
+    const div = document.createElement("div");
+    div.innerText = ep.number;
+    list.appendChild(div);
+  });
+}
+
+load();
+</script>
+
+</body>
+</html>
