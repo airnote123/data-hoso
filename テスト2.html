@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>放送表示</title>
+<title>放送表示システム</title>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 <script src="https://cdn.tailwindcss.com"></script>
@@ -16,68 +16,104 @@
 
 <h1 class="text-2xl font-bold mb-4">放送内容</h1>
 
+<!-- ステータス -->
+<div id="connection" class="text-sm mb-1"></div>
 <div id="status" class="text-sm text-gray-500 mb-1"></div>
 <div id="note" class="text-sm text-blue-600 mb-4"></div>
 
+<!-- 内容 -->
 <div id="list" class="space-y-4"></div>
 
 <script>
 const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ===== 接続チェック =====
+const connectionEl = document.getElementById("connection");
 
-async function load() {
-  const { data, error } = await supabase
-    .from("broadcasts")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (error || !data || data.length === 0) return;
-
-  const row = data[0];
-
-  document.getElementById("status").innerText =
-    "最終更新: " + new Date(row.created_at).toLocaleString();
-
-  document.getElementById("note").innerText = row.note || "";
-
-  const episodes = JSON.parse(row.content);
-
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-
-  episodes.forEach(ep => {
-    const div = document.createElement("div");
-    div.className = "bg-white p-4 rounded shadow";
-
-    div.innerHTML = `
-      <div class="font-bold">${ep.number} (${ep.date})</div>
-
-      <div class="mt-2">
-        <b>オープニング</b>
-        <p class="preserve">${ep.opening || ""}</p>
-      </div>
-
-      <div class="mt-2">
-        <b>企画</b>
-        <p class="preserve">${ep.trivia || ""}</p>
-      </div>
-
-      <div class="mt-2">
-        <b>エンディング</b>
-        <p class="preserve">${ep.ending || ""}</p>
-      </div>
-    `;
-
-    list.appendChild(div);
-  });
+if (!window.supabase) {
+  connectionEl.innerText = "❌ Supabase未接続";
+} else {
+  connectionEl.innerText = "🟡 接続確認中...";
 }
 
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ===== メイン処理 =====
+async function load() {
+  const statusEl = document.getElementById("status");
+  const noteEl = document.getElementById("note");
+
+  try {
+    statusEl.innerText = "通信中...";
+
+    const { data, error } = await supabase
+      .from("broadcasts")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (error) {
+      connectionEl.innerText = "❌ 接続エラー";
+      statusEl.innerText = error.message;
+      return;
+    }
+
+    connectionEl.innerText = "✅ 接続成功";
+
+    if (!data || data.length === 0) {
+      statusEl.innerText = "データなし";
+      return;
+    }
+
+    const row = data[0];
+
+    statusEl.innerText =
+      "最終更新: " + new Date(row.created_at).toLocaleString();
+
+    noteEl.innerText = row.note || "";
+
+    const episodes = JSON.parse(row.content);
+
+    const list = document.getElementById("list");
+    list.innerHTML = "";
+
+    episodes.forEach(ep => {
+      const div = document.createElement("div");
+      div.className = "bg-white p-4 rounded shadow";
+
+      div.innerHTML = `
+        <div class="font-bold">${ep.number} (${ep.date})</div>
+
+        <div class="mt-2">
+          <b>オープニング</b>
+          <p class="preserve">${ep.opening || ""}</p>
+        </div>
+
+        <div class="mt-2">
+          <b>企画</b>
+          <p class="preserve">${ep.trivia || ""}</p>
+        </div>
+
+        <div class="mt-2">
+          <b>エンディング</b>
+          <p class="preserve">${ep.ending || ""}</p>
+        </div>
+      `;
+
+      list.appendChild(div);
+    });
+
+  } catch (e) {
+    connectionEl.innerText = "❌ 重大エラー";
+    statusEl.innerText = e.message;
+  }
+}
+
+// ===== 初回実行 =====
 load();
 
-// リアルタイム更新
+// ===== リアルタイム更新 =====
 supabase
   .channel('realtime-broadcasts')
   .on(
