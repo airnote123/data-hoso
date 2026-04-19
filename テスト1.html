@@ -1,15 +1,40 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>放送表示デバッグ</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+.preserve { white-space: pre-wrap; }
+</style>
+</head>
+
+<body class="bg-slate-100 p-6">
+
+<h1 class="text-xl font-bold mb-4">デバッグ画面</h1>
+
+<div id="status" class="mb-2 text-sm text-gray-700">初期化中...</div>
+
+<div id="debug" class="bg-black text-green-400 p-3 text-xs rounded whitespace-pre-wrap mb-4"></div>
+
+<div id="list" class="space-y-2"></div>
+
 <script>
 const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
 
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const debug = document.getElementById("debug");
 function log(msg) {
-  debug.innerText += msg + "\n";
+  document.getElementById("debug").innerText += msg + "\n";
 }
 
 async function load() {
+  const status = document.getElementById("status");
+
   log("①開始");
 
   try {
@@ -17,7 +42,7 @@ async function load() {
       .from("broadcasts")
       .select("*");
 
-    log("②レスポンス取得");
+    log("②取得完了");
 
     log("data ↓");
     log(JSON.stringify(res.data));
@@ -26,12 +51,12 @@ async function load() {
     log(JSON.stringify(res.error));
 
     if (res.error) {
-      log("❌ エラーあり");
+      status.innerText = "❌ エラーあり";
       return;
     }
 
     if (!res.data || res.data.length === 0) {
-      log("⚠️ データなし");
+      status.innerText = "⚠️ データなし";
       return;
     }
 
@@ -40,25 +65,44 @@ async function load() {
     log("③content ↓");
     log(row.content);
 
-    let parsed;
+    let episodes;
     try {
-      parsed = JSON.parse(row.content);
+      episodes = JSON.parse(row.content);
       log("④JSON OK");
     } catch (e) {
-      log("❌ JSONエラー");
+      status.innerText = "❌ JSONエラー";
+      log("JSONエラー: " + e.message);
       return;
     }
 
-    log("⑤表示開始");
+    status.innerText = "✅ 表示成功";
 
-    parsed.forEach(ep => {
-      log("・" + ep.number);
-    });
+    render(episodes);
 
   } catch (e) {
-    log("❌ 重大エラー: " + e.message);
+    status.innerText = "❌ 重大エラー";
+    log("重大エラー: " + e.message);
   }
+}
+
+function render(episodes) {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  episodes.forEach(ep => {
+    const div = document.createElement("div");
+    div.className = "bg-white p-2 rounded shadow";
+
+    div.innerHTML = `
+      <b>${ep.number}</b> (${ep.date})
+    `;
+
+    list.appendChild(div);
+  });
 }
 
 load();
 </script>
+
+</body>
+</html>
