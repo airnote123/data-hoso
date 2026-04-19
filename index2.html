@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>放送表示（閲覧専用）</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+.preserve { white-space: pre-wrap; }
+</style>
+</head>
+
+<body class="bg-slate-100 p-6">
+
+<h1 class="text-2xl font-bold mb-6">放送内容</h1>
+
+<div id="status" class="mb-4 text-sm text-gray-500">読み込み中...</div>
+<div id="list" class="space-y-4"></div>
+
+<script>
+// ===== Supabase =====
+const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_xxx";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ===== 読み込み =====
+async function load() {
+  const { data, error } = await supabase
+    .from("jsons")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    document.getElementById("status").innerText = "取得失敗";
+    return;
+  }
+
+  document.getElementById("status").innerText =
+    "最終更新: " + new Date(data.created_at).toLocaleString();
+
+  const episodes = JSON.parse(data.content);
+  render(episodes);
+}
+
+// ===== 表示 =====
+function render(episodes) {
+  const list = document.getElementById("list");
+  list.innerHTML = "";
+
+  episodes.forEach(ep => {
+    const div = document.createElement("div");
+    div.className = "bg-white p-4 rounded shadow";
+
+    div.innerHTML = `
+      <div class="font-bold text-lg">${ep.number} (${ep.date})</div>
+
+      <div class="mt-2">
+        <b>オープニング</b>
+        <p class="preserve">${ep.opening || ""}</p>
+      </div>
+
+      <div class="mt-2">
+        <b>企画</b>
+        <p class="preserve">${ep.trivia || ""}</p>
+      </div>
+
+      <div class="mt-2">
+        <b>エンディング</b>
+        <p class="preserve">${ep.ending || ""}</p>
+      </div>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// 初回実行
+load();
+</script>
+
+</body>
+</html>
