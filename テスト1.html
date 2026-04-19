@@ -1,21 +1,114 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>テスト</title>
+<title>完全デバッグ表示</title>
 
 <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+body { font-family: monospace; }
+</style>
 </head>
 
-<body>
+<body class="bg-slate-100 p-4">
 
-<p id="status">初期化中</p>
+<h1 class="text-xl font-bold mb-4">全表示デバッグ</h1>
+
+<div id="status" class="mb-2 text-sm font-bold"></div>
+
+<div id="log" class="bg-black text-green-400 p-3 text-xs whitespace-pre-wrap rounded mb-4"></div>
+
+<div id="result" class="bg-white p-3 rounded shadow"></div>
 
 <script>
+const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+
+function log(msg) {
+  document.getElementById("log").innerText += msg + "\n";
+}
+
+document.getElementById("status").innerText = "① JS開始";
+log("① JS開始");
+
+// Supabaseチェック
 if (!window.supabase) {
-  document.getElementById("status").innerText = "❌ Supabase読込失敗";
+  document.getElementById("status").innerText = "❌ Supabase未読込";
+  log("❌ Supabase未読込");
 } else {
-  document.getElementById("status").innerText = "✅ Supabase読込OK";
+  log("② Supabase読込OK");
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  async function run() {
+    try {
+      document.getElementById("status").innerText = "③ 通信開始";
+      log("③ 通信開始");
+
+      const { data, error } = await supabase
+        .from("broadcasts")
+        .select("*");
+
+      log("④ 通信完了");
+
+      log("data:");
+      log(JSON.stringify(data));
+
+      log("error:");
+      log(JSON.stringify(error));
+
+      if (error) {
+        document.getElementById("status").innerText = "❌ エラー発生";
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        document.getElementById("status").innerText = "⚠️ データなし";
+        return;
+      }
+
+      const row = data[0];
+
+      log("⑤ content:");
+      log(row.content);
+
+      let parsed;
+
+      try {
+        parsed = JSON.parse(row.content);
+        log("⑥ JSON解析OK");
+      } catch (e) {
+        document.getElementById("status").innerText = "❌ JSONエラー";
+        log("JSONエラー: " + e.message);
+        return;
+      }
+
+      document.getElementById("status").innerText = "✅ 完全成功";
+
+      const result = document.getElementById("result");
+      result.innerHTML = "";
+
+      parsed.forEach(ep => {
+        const div = document.createElement("div");
+        div.className = "mb-2 border-b pb-2";
+
+        div.innerHTML = `
+          <b>${ep.number}</b> (${ep.date})<br>
+          ${ep.opening || ""}
+        `;
+
+        result.appendChild(div);
+      });
+
+    } catch (e) {
+      document.getElementById("status").innerText = "❌ 重大エラー";
+      log("重大エラー: " + e.message);
+    }
+  }
+
+  run();
 }
 </script>
 
