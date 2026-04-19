@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>放送原稿一覧</title>
+    <!-- Supabase JS Library -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666666;
+            --accent: #0066ff;
+            --border: #f0f0f0;
+            --card-bg: #ffffff;
+            --note-bg: #f8f9fa;
+            --status-color: #10b981;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Sans", "Meiryo", sans-serif;
+            line-height: 1.6; 
+            padding: 20px; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            -webkit-font-smoothing: antialiased;
+            position: relative;
+        }
+        
+        /* ステータス・更新日時コンテナ */
+        #meta-info {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 2px;
+        }
+
+        #status { 
+            font-size: 0.65rem;
+            color: var(--status-color);
+            cursor: pointer;
+            user-select: none;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            opacity: 0.8;
+            letter-spacing: 0.05em;
+            padding: 4px;
+        }
+        #status::before {
+            content: "";
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: var(--status-color);
+            border-radius: 50%;
+        }
+
+        #last-updated {
+            font-size: 0.6rem;
+            color: #bbb;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+
+        header {
+            margin: 0 0 25px 0;
+            padding: 0;
+            border-bottom: 2px solid var(--text-main);
+            display: inline-block;
+        }
+
+        h1 { 
+            font-size: 1.5rem; 
+            font-weight: 900;
+            margin: 0;
+            color: var(--text-main);
+            padding-bottom: 5px;
+        }
+
+        #note-container {
+            display: none; 
+            margin: 0 0 35px 0; 
+            padding: 2px 0 2px 15px; 
+            border-left: 4px solid var(--accent); 
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .note-label {
+            font-size: 0.7rem;
+            color: var(--accent); 
+            font-weight: 900;
+            display: block;
+            margin: 0 !important;
+            padding: 0 !important;
+            line-height: 1; 
+            letter-spacing: 0.1em;
+        }
+
+        #note {
+            margin: 10px 0 0 0 !important; 
+            padding: 0 !important;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            display: block;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        #list {
+            display: flex;
+            flex-direction: column;
+            gap: 45px;
+        }
+
+        .episode-card { 
+            background: var(--card-bg);
+            padding-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .episode-header { 
+            display: flex; 
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: #f8fafc;
+            padding: 12px 15px;
+            border-radius: 6px;
+            border-left: 4px solid var(--text-main);
+        }
+
+        .episode-number {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--text-main);
+        }
+
+        .episode-date { 
+            color: var(--text-main); 
+            font-size: 0.95rem; 
+            font-weight: 700;
+        }
+        .date-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: normal;
+            margin-right: 5px;
+        }
+
+        .info-sections {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            padding-left: 5px;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .label { 
+            flex: 0 0 90px;
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: var(--accent);
+            padding-top: 4px;
+        }
+
+        .content { 
+            flex: 1;
+            font-size: 1rem;
+            font-weight: 500;
+            line-height: 1.7;
+            color: var(--text-main);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            min-width: 0;
+        }
+
+        #modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(4px);
+        }
+        .modal-content {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+            width: 280px;
+        }
+        .modal-content input {
+            display: block;
+            margin: 15px auto;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 1rem;
+        }
+        .modal-content button {
+            width: 100%;
+            padding: 12px;
+            background: var(--text-main);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .modal-content button#admin-cancel {
+            background: transparent;
+            color: #999;
+        }
+
+        @media (max-width: 600px) {
+            .info-item {
+                flex-direction: column;
+            }
+            .label {
+                flex: none;
+                margin-bottom: 4px;
+                padding-top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="meta-info">
+    <div id="status">Connecting</div>
+    <div id="last-updated"></div>
+</div>
+
+<header>
+    <h1>放送原稿</h1>
+</header>
+
+<div id="note-container">
+    <span class="note-label">UPDATE / NOTE</span>
+    <div id="note"></div>
+</div>
+
+<div id="list"></div>
+
+<div id="modal-overlay">
+    <div class="modal-content">
+        <div style="font-weight: 900; font-size: 1.1rem;">Admin Access</div>
+        <input type="password" id="admin-password" placeholder="Password">
+        <button id="admin-submit">Export JSON</button>
+        <button id="admin-cancel">Cancel</button>
+    </div>
+</div>
+
+<script>
+(function() {
+    let currentContentData = null;
+    let tapCount = 0;
+    let tapTimer = null;
+
+    const initApp = () => {
+        const statusEl = document.getElementById("status");
+        const updatedEl = document.getElementById("last-updated");
+        const listEl = document.getElementById("list");
+        const noteEl = document.getElementById("note");
+        const noteContainer = document.getElementById("note-container");
+        const modal = document.getElementById("modal-overlay");
+        const passInput = document.getElementById("admin-password");
+
+        if (typeof window.supabase === 'undefined') return;
+
+        const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+        const SUPABASE_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        statusEl.addEventListener('click', () => {
+            tapCount++;
+            clearTimeout(tapTimer);
+            tapTimer = setTimeout(() => { tapCount = 0; }, 2000);
+
+            if (tapCount >= 5) {
+                tapCount = 0;
+                modal.style.display = "flex";
+                passInput.focus();
+            }
+        });
+
+        document.getElementById('admin-cancel').onclick = () => {
+            modal.style.display = "none";
+            passInput.value = "";
+        };
+
+        document.getElementById('admin-submit').onclick = () => {
+            if (passInput.value === "password") {
+                if (currentContentData) {
+                    const jsonStr = JSON.stringify(currentContentData, null, 2);
+                    const el = document.createElement('textarea');
+                    el.value = jsonStr;
+                    el.setAttribute('readonly', '');
+                    el.style.position = 'absolute';
+                    el.style.left = '-9999px';
+                    document.body.appendChild(el);
+                    el.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(el);
+                    alert("放送内容のJSONをコピーしました");
+                }
+                modal.style.display = "none";
+                passInput.value = "";
+            } else {
+                alert("Incorrect password");
+            }
+        };
+
+        // 指定の形式（最終更新日:2026/4/1 00:00）に整形
+        function formatDate(dateStr) {
+            if (!dateStr) return "";
+            const date = new Date(dateStr);
+            const y = date.getFullYear();
+            const m = date.getMonth() + 1;
+            const d = date.getDate();
+            const h = String(date.getHours()).padStart(2, '0');
+            const min = String(date.getMinutes()).padStart(2, '0');
+            return `最終更新日:${y}/${m}/${d} ${h}:${min}`;
+        }
+
+        function render(data) {
+            if (!data || data.length === 0) return;
+            const row = data[0];
+            
+            // 更新日時の表示
+            updatedEl.innerText = formatDate(row.updated_at || row.created_at);
+            
+            const noteText = row.note ? row.note.trim() : "";
+            if (noteText && noteText !== "なし" && noteText !== "（なし）") {
+                noteEl.innerText = noteText;
+                noteContainer.style.display = "block";
+            } else {
+                noteContainer.style.display = "none";
+            }
+
+            let episodes = [];
+            try {
+                episodes = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+                currentContentData = episodes;
+            } catch (e) {
+                console.error("JSON parse error:", e);
+                return;
+            }
+            
+            listEl.innerHTML = "";
+            episodes.forEach(ep => {
+                const card = document.createElement("div");
+                card.className = "episode-card";
+                card.innerHTML = `
+                    <div class="episode-header">
+                        <span class="episode-number">放送番号：${ep.number || "-"}</span>
+                        <span class="episode-date"><span class="date-label">放送日：</span>${ep.date || "-"}</span>
+                    </div>
+                    <div class="info-sections">
+                        <div class="info-item">
+                            <span class="label">【OP】</span>
+                            <span class="content">${ep.opening || ""}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">【企画】</span>
+                            <span class="content">${ep.trivia || ""}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="label">【ED】</span>
+                            <span class="content">${ep.ending || ""}</span>
+                        </div>
+                    </div>
+                `;
+                listEl.appendChild(card);
+            });
+        }
+
+        async function loadData() {
+            try {
+                const { data, error } = await supabase
+                    .from("broadcasts")
+                    .select("*")
+                    .order("created_at", { ascending: false })
+                    .limit(1);
+
+                if (error) throw error;
+                render(data);
+                statusEl.innerText = "Synced";
+            } catch (err) {
+                console.error("Fetch error:", err);
+                statusEl.innerText = "Offline";
+            }
+        }
+
+        loadData();
+        setInterval(loadData, 1000);
+    };
+
+    if (document.readyState === 'complete') {
+        initApp();
+    } else {
+        window.addEventListener('load', initApp);
+    }
+})();
+</script>
+
+</body>
+</html>
