@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>放送原稿一覧</title>
+    <title>データ共有</title>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <style>
         :root {
@@ -173,7 +173,7 @@
     </a>
 </div>
 
-<header><h1>共有中最新データ</h1></header>
+<header><h1>共有中の最新データ</h1></header>
 
 <div id="note-container">
     <span class="note-label">UPDATE / NOTE</span>
@@ -230,7 +230,7 @@
         const row = data[0];
 
         if (row.alert && row.alert.trim() !== "" && row.alert !== "なし") {
-            alertBox.innerText = `⚠️ ${row.alert}`;
+            alertBox.innerText = `🚨${row.alert}`;
             alertBox.style.display = "block";
         } else {
             alertBox.style.display = "none";
