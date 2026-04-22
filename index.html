@@ -16,13 +16,16 @@
             --status-color: #10b981;
             --alert-bg: #fee2e2;
             --alert-text: #dc2626;
+            --radius-lg: 28px;
+            --radius-md: 20px;
+            --radius-sm: 12px;
         }
 
         body { 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Sans", "Meiryo", sans-serif;
             line-height: 1.6; 
             padding: 20px; 
-            padding-top: 80px; /* アラートが固定されるための余白 */
+            padding-top: 100px; 
             max-width: 900px; 
             margin: 0 auto; 
             background-color: var(--bg-color); 
@@ -30,146 +33,193 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* 緊急アラート - 常に上部に固定 */
+        /* 緊急アラート - 完全に括られた（フローティング）スタイル */
         #emergency-alert {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            width: calc(100% - 20px);
             background: var(--alert-bg);
-            border-bottom: 2px solid var(--alert-text);
+            border: 2px solid var(--alert-text); /* 全方位を囲む */
             color: var(--alert-text);
-            padding: 12px 20px;
+            padding: 14px 20px;
             font-weight: 900;
             text-align: center;
             font-size: 1.1rem;
             z-index: 2000;
             box-sizing: border-box;
-            box-shadow: 0 2px 10px rgba(220, 38, 38, 0.1);
+            box-shadow: 0 8px 20px rgba(220, 38, 38, 0.15);
+            border-radius: var(--radius-md); /* 四隅を丸く */
             animation: pulse 1.5s infinite;
         }
 
         @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.85; }
-            100% { opacity: 1; }
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.95; transform: scale(0.99); }
+            100% { opacity: 1; transform: scale(1); }
         }
 
         /* メタ情報コンテナ */
         #meta-info {
             position: absolute;
-            top: 75px; /* アラートの下に来るように調整 */
-            right: 15px;
+            top: 100px; /* アラートの位置に合わせて調整 */
+            right: 20px;
             text-align: right;
             display: flex;
             flex-direction: column;
             align-items: flex-end;
-            gap: 4px;
+            gap: 8px;
             z-index: 100;
         }
 
         #status { 
-            font-size: 0.65rem;
+            font-size: 0.7rem;
             color: var(--status-color);
+            background: #ecfdf5;
+            padding: 5px 14px;
+            border-radius: var(--radius-lg);
             cursor: pointer;
             font-weight: bold;
             display: flex;
             align-items: center;
-            gap: 4px;
-            padding: 4px;
+            gap: 6px;
+            box-shadow: 0 2px 5px rgba(16, 185, 129, 0.1);
         }
         #status::before {
             content: "";
-            width: 6px; height: 6px;
+            width: 8px; height: 8px;
             background-color: var(--status-color);
             border-radius: 50%;
         }
 
         #last-updated {
-            font-size: 0.6rem;
-            color: #bbb;
-            margin-bottom: 4px;
+            font-size: 0.65rem;
+            color: #aaa;
+            margin-right: 6px;
         }
 
-        /* 時計ボタンのデザイン */
+        /* 時計ボタン */
         .clock-link {
             display: inline-flex;
             align-items: center;
             background: #f0f7ff;
             color: var(--accent);
             text-decoration: none;
-            font-size: 0.7rem;
+            font-size: 0.75rem;
             font-weight: bold;
-            padding: 4px 10px;
-            border-radius: 20px;
+            padding: 8px 16px;
+            border-radius: var(--radius-lg);
             border: 1px solid #d0e4ff;
-            transition: all 0.2s;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 5px rgba(0, 102, 255, 0.05);
         }
         .clock-link:hover {
             background: var(--accent);
             color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 102, 255, 0.2);
         }
 
         header {
-            margin: 20px 0 25px 0;
-            border-bottom: 2px solid var(--text-main);
+            margin: 20px 0 30px 0;
+            border-bottom: 3px solid var(--text-main);
             display: inline-block;
         }
 
-        h1 { font-size: 1.5rem; font-weight: 900; padding-bottom: 5px; margin: 0; }
+        h1 { font-size: 1.6rem; font-weight: 900; padding-bottom: 8px; margin: 0; }
 
         #note-container {
             display: none; 
-            margin: 0 0 35px 0; 
-            padding-left: 15px; 
-            border-left: 4px solid var(--accent); 
+            margin: 0 0 40px 0; 
+            padding: 18px 22px;
+            background: #f0f7ff;
+            border-radius: var(--radius-md);
+            border-left: 8px solid var(--accent); 
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.05);
         }
 
         .note-label {
-            font-size: 0.7rem; color: var(--accent); 
+            font-size: 0.75rem; color: var(--accent); 
             font-weight: 900; letter-spacing: 0.1em;
+            display: block;
+            margin-bottom: 6px;
         }
 
-        #note { margin-top: 10px; font-size: 0.95rem; white-space: pre-wrap; }
+        #note { font-size: 1rem; white-space: pre-wrap; color: #333; line-height: 1.7; }
 
         .episode-card { 
-            padding-bottom: 30px;
+            padding-bottom: 35px;
             border-bottom: 1px solid var(--border);
-            margin-bottom: 40px;
+            margin-bottom: 45px;
         }
         
         .episode-header { 
             display: flex; 
             justify-content: space-between;
             background: #f8fafc;
-            padding: 12px 15px;
-            border-radius: 6px;
-            border-left: 4px solid var(--text-main);
-            margin-bottom: 20px;
+            padding: 16px 22px;
+            border-radius: var(--radius-md);
+            border-left: 6px solid var(--text-main);
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         }
 
-        .episode-number { font-weight: 800; }
-        .episode-date { font-weight: 700; font-size: 0.95rem; }
+        .episode-number { font-weight: 800; font-size: 1.1rem; }
+        .episode-date { font-weight: 700; font-size: 0.95rem; color: var(--text-muted); }
 
-        .label { flex: 0 0 90px; font-size: 0.75rem; font-weight: 800; color: var(--accent); padding-top: 4px; }
-        .content { flex: 1; font-weight: 500; white-space: pre-wrap; }
+        .label { flex: 0 0 110px; font-size: 0.8rem; font-weight: 800; color: var(--accent); padding-top: 2px; }
+        .content { flex: 1; font-weight: 500; white-space: pre-wrap; font-size: 1rem; color: #222; }
 
-        .info-item { display: flex; margin-bottom: 18px; }
+        .info-item { display: flex; margin-bottom: 22px; align-items: flex-start; }
 
         #modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.85); z-index: 3000; justify-content: center; align-items: center;
-            backdrop-filter: blur(4px);
+            background: rgba(0,0,0,0.7); z-index: 3000; justify-content: center; align-items: center;
+            backdrop-filter: blur(8px);
         }
-        .modal-content { background: white; padding: 30px; border-radius: 16px; width: 280px; text-align: center; }
-        .modal-content input { width: 100%; padding: 12px; margin: 15px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .modal-content button { width: 100%; padding: 12px; background: var(--text-main); color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .modal-content { 
+            background: white; 
+            padding: 45px 35px; 
+            border-radius: var(--radius-lg); 
+            width: 320px; 
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+        .modal-content input { 
+            width: 100%; 
+            padding: 16px; 
+            margin: 20px 0; 
+            border: 2px solid #f0f0f0; 
+            border-radius: var(--radius-sm); 
+            box-sizing: border-box;
+            outline: none;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .modal-content input:focus { border-color: var(--accent); background: #f8fbff; }
+        .modal-content button { 
+            width: 100%; 
+            padding: 16px; 
+            background: var(--text-main); 
+            color: white; 
+            border: none; 
+            border-radius: var(--radius-sm); 
+            font-weight: bold; 
+            cursor: pointer;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        .modal-content button:active { opacity: 0.8; }
 
         @media (max-width: 600px) { 
-            .info-item { flex-direction: column; } 
-            body { padding-top: 70px; }
-            #meta-info { top: 65px; }
+            .info-item { flex-direction: column; gap: 6px; } 
+            body { padding-top: 100px; }
+            #meta-info { top: 90px; right: 15px; }
+            header { margin-top: 50px; }
+            #emergency-alert { font-size: 1rem; padding: 12px 15px; }
         }
     </style>
 </head>
@@ -196,10 +246,11 @@
 
 <div id="modal-overlay">
     <div class="modal-content">
-        <div style="font-weight: 900;">Admin Access</div>
+        <div style="font-weight: 900; font-size: 1.3rem; margin-bottom: 12px;">Admin Access</div>
+        <div style="font-size: 0.85rem; color: #888;">管理用パスワードを入力してください</div>
         <input type="password" id="admin-password" placeholder="Password">
         <button id="admin-submit">Export JSON</button>
-        <button onclick="document.getElementById('modal-overlay').style.display='none'" style="background:none; color:#999; margin-top:10px;">Cancel</button>
+        <button onclick="document.getElementById('modal-overlay').style.display='none'" style="background:none; color:#aaa; font-size: 0.95rem; border:none; cursor:pointer;">Cancel</button>
     </div>
 </div>
 
@@ -242,16 +293,17 @@
         const row = data[0];
 
         if (row.alert && row.alert.trim() !== "" && row.alert !== "なし") {
-            alertBox.innerText = `🚨${row.alert}`;
+            alertBox.innerText = `🚨 ${row.alert}`;
             alertBox.style.display = "block";
-            document.body.style.paddingTop = alertBox.offsetHeight + "px";
+            // アラートの高さ＋マージン分、bodyの余白を調整
+            document.body.style.paddingTop = (alertBox.offsetHeight + 25) + "px";
         } else {
             alertBox.style.display = "none";
             document.body.style.paddingTop = "20px";
         }
 
         const date = new Date(row.updated_at || row.created_at);
-        updatedEl.innerText = `最終更新日:${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+        updatedEl.innerText = `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')} 更新`;
 
         if (row.note && row.note.trim() !== "" && row.note !== "なし") {
             noteEl.innerText = row.note;
@@ -267,7 +319,7 @@
                 <div class="episode-card">
                     <div class="episode-header">
                         <span class="episode-number">放送番号：${ep.number || "-"}</span>
-                        <span class="episode-date">放送日：${ep.date || "-"}</span>
+                        <span class="episode-date">${ep.date || "-"}</span>
                     </div>
                     <div class="info-item"><span class="label">【OP】</span><span class="content">${ep.opening || ""}</span></div>
                     <div class="info-item"><span class="label">【企画】</span><span class="content">${ep.trivia || ""}</span></div>
@@ -282,7 +334,7 @@
         if (!error) { render(data); statusEl.innerText = "Synced"; }
     }
 
-    setInterval(loadData, 1000);
+    setInterval(loadData, 2000);
     loadData();
 })();
 </script>
