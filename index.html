@@ -33,7 +33,7 @@
             -webkit-font-smoothing: antialiased;
         }
 
-        /* 緊急アラート - 完全に括られた（フローティング）スタイル */
+        /* 緊急アラート */
         #emergency-alert {
             display: none;
             position: fixed;
@@ -42,7 +42,7 @@
             right: 10px;
             width: calc(100% - 20px);
             background: var(--alert-bg);
-            border: 2px solid var(--alert-text); /* 全方位を囲む */
+            border: 2px solid var(--alert-text);
             color: var(--alert-text);
             padding: 14px 20px;
             font-weight: 900;
@@ -51,7 +51,7 @@
             z-index: 2000;
             box-sizing: border-box;
             box-shadow: 0 8px 20px rgba(220, 38, 38, 0.15);
-            border-radius: var(--radius-md); /* 四隅を丸く */
+            border-radius: var(--radius-md);
             animation: pulse 1.5s infinite;
         }
 
@@ -61,10 +61,9 @@
             100% { opacity: 1; transform: scale(1); }
         }
 
-        /* メタ情報コンテナ */
         #meta-info {
             position: absolute;
-            top: 100px; /* アラートの位置に合わせて調整 */
+            top: 100px;
             right: 20px;
             text-align: right;
             display: flex;
@@ -100,7 +99,6 @@
             margin-right: 6px;
         }
 
-        /* 時計ボタン */
         .clock-link {
             display: inline-flex;
             align-items: center;
@@ -267,25 +265,38 @@
     const noteEl = document.getElementById("note");
     const noteContainer = document.getElementById("note-container");
     const modal = document.getElementById("modal-overlay");
+    const passwordInput = document.getElementById("admin-password");
 
     const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
     const SUPABASE_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+    // 5回タップで管理モーダルを表示する処理の修正
     statusEl.onclick = () => {
         tapCount++;
         clearTimeout(tapTimer);
         tapTimer = setTimeout(() => tapCount = 0, 2000);
-        if (tapCount >= 5) { modal.style.display = "flex"; document.getElementById("").focus(hoso2026); }
+        if (tapCount >= 5) { 
+            tapCount = 0;
+            modal.style.display = "flex"; 
+            passwordInput.value = ""; // 入力欄をクリア
+            passwordInput.focus(); 
+        }
     };
 
     document.getElementById("admin-submit").onclick = () => {
-        if (document.getElementById("admin-password").value === "hoso2026admin") {
+        if (passwordInput.value === "hoso2026admin") {
             const el = document.createElement('textarea');
             el.value = JSON.stringify(currentContentData, null, 2);
-            document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
-            alert("JSONをコピーしました"); modal.style.display = "none";
-        } else { alert("Incorrect password"); }
+            document.body.appendChild(el); 
+            el.select(); 
+            document.execCommand('copy'); 
+            document.body.removeChild(el);
+            alert("JSONをコピーしました"); 
+            modal.style.display = "none";
+        } else { 
+            alert("Incorrect password"); 
+        }
     };
 
     function render(data) {
@@ -295,7 +306,6 @@
         if (row.alert && row.alert.trim() !== "" && row.alert !== "なし") {
             alertBox.innerText = `🚨 ${row.alert}`;
             alertBox.style.display = "block";
-            // アラートの高さ＋マージン分、bodyの余白を調整
             document.body.style.paddingTop = (alertBox.offsetHeight + 25) + "px";
         } else {
             alertBox.style.display = "none";
@@ -326,12 +336,28 @@
                     <div class="info-item"><span class="label">【ED】</span><span class="content">${ep.ending || ""}</span></div>
                 </div>
             `).join('');
-        } catch (e) { console.error(e); }
+        } catch (e) { 
+            console.error("Content Parse Error:", e); 
+        }
     }
 
     async function loadData() {
-        const { data, error } = await supabase.from("broadcasts").select("*").order("created_at", { ascending: false }).limit(1);
-        if (!error) { render(data); statusEl.innerText = "Synced"; }
+        try {
+            const { data, error } = await supabase.from("broadcasts").select("*").order("created_at", { ascending: false }).limit(1);
+            if (!error) { 
+                render(data); 
+                statusEl.innerText = "Synced"; 
+                statusEl.style.backgroundColor = "#ecfdf5";
+                statusEl.style.color = "#10b981";
+            } else {
+                throw error;
+            }
+        } catch (err) {
+            console.error("Load Error:", err);
+            statusEl.innerText = "Error";
+            statusEl.style.backgroundColor = "#fee2e2";
+            statusEl.style.color = "#dc2626";
+        }
     }
 
     setInterval(loadData, 2000);
