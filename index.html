@@ -276,7 +276,7 @@
         tapCount++;
         clearTimeout(tapTimer);
         tapTimer = setTimeout(() => tapCount = 0, 2000);
-        if (tapCount >= 5) { modal.style.display = "flex"; document.getElementById("admin-password").focus(); }
+        if (tapCount >= 5) { modal.style.display = "flex"; document.getElementById("admin-password").focus(hoso2026); }
     };
 
     document.getElementById("admin-submit").onclick = () => {
