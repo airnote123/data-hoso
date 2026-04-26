@@ -280,7 +280,7 @@
     };
 
     document.getElementById("admin-submit").onclick = () => {
-        if (document.getElementById("admin-password").value === "password") {
+        if (document.getElementById("admin-password").value === "hoso2026admin") {
             const el = document.createElement('textarea');
             el.value = JSON.stringify(currentContentData, null, 2);
             document.body.appendChild(el); el.select(); document.execCommand('copy'); document.body.removeChild(el);
