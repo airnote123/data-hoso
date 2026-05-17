@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>データ共有</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-main: #1a1a1a;
+            --text-muted: #666666;
+            --accent: #0066ff;
+            --border: #f0f0f0;
+            --card-bg: #ffffff;
+            --status-color: #10b981;
+            --alert-bg: #fee2e2;
+            --alert-text: #dc2626;
+            --radius-lg: 28px;
+            --radius-md: 20px;
+            --radius-sm: 12px;
+        }
+
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Hiragino Sans", "Meiryo", sans-serif;
+            line-height: 1.6; 
+            padding: 20px; 
+            padding-top: 130px; /* リンク追加に伴いヘッダーと被らないよう上部余白を調整 */
+            max-width: 900px; 
+            margin: 0 auto; 
+            background-color: var(--bg-color); 
+            color: var(--text-main); 
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* 緊急アラート */
+        #emergency-alert {
+            display: none;
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            width: calc(100% - 20px);
+            background: var(--alert-bg);
+            border: 2px solid var(--alert-text);
+            color: var(--alert-text);
+            padding: 14px 20px;
+            font-weight: 900;
+            text-align: center;
+            font-size: 1.1rem;
+            z-index: 2000;
+            box-sizing: border-box;
+            box-shadow: 0 8px 20px rgba(220, 38, 38, 0.15);
+            border-radius: var(--radius-md);
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.95; transform: scale(0.99); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        #meta-info {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            text-align: right;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        #status { 
+            font-size: 0.7rem;
+            color: var(--status-color);
+            background: #ecfdf5;
+            padding: 5px 14px;
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 2px 5px rgba(16, 185, 129, 0.1);
+        }
+        #status::before {
+            content: "";
+            width: 8px; height: 8px;
+            background-color: var(--status-color);
+            border-radius: 50%;
+        }
+
+        #last-updated {
+            font-size: 0.65rem;
+            color: #aaa;
+            margin-right: 6px;
+        }
+
+        .external-link {
+            display: inline-flex;
+            align-items: center;
+            background: #f0f7ff;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: var(--radius-lg);
+            border: 1px solid #d0e4ff;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 2px 5px rgba(0, 102, 255, 0.05);
+        }
+        .external-link:hover {
+            background: var(--accent);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 102, 255, 0.2);
+        }
+
+        /* ドライブリンク用のスタイル（オレンジ色） */
+        .drive-link {
+            background: #fff7ed;
+            color: #ea580c;
+            border: 1px solid #ffedd5;
+        }
+        .drive-link:hover {
+            background: #ea580c;
+            color: white;
+            box-shadow: 0 4px 10px rgba(234, 88, 12, 0.15);
+        }
+
+        header {
+            margin: 20px 0 30px 0;
+            border-bottom: 3px solid var(--text-main);
+            display: inline-block;
+        }
+
+        h1 { font-size: 1.6rem; font-weight: 900; padding-bottom: 8px; margin: 0; }
+
+        #note-container {
+            display: none; 
+            margin: 0 0 40px 0; 
+            padding: 18px 22px;
+            background: #f0f7ff;
+            border-radius: var(--radius-md);
+            border-left: 8px solid var(--accent); 
+            box-shadow: 0 4px 12px rgba(0, 102, 255, 0.05);
+        }
+
+        .note-label {
+            font-size: 0.75rem; color: var(--accent); 
+            font-weight: 900; letter-spacing: 0.1em;
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        #note { font-size: 1rem; white-space: pre-wrap; color: #333; line-height: 1.7; }
+
+        .episode-card { 
+            padding-bottom: 35px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 45px;
+        }
+        
+        .episode-header { 
+            display: flex; 
+            justify-content: space-between;
+            background: #f8fafc;
+            padding: 16px 22px;
+            border-radius: var(--radius-md);
+            border-left: 6px solid var(--text-main);
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+        }
+
+        .episode-number { font-weight: 800; font-size: 1.1rem; }
+        .episode-date { font-weight: 700; font-size: 0.95rem; color: var(--text-muted); }
+
+        .label { flex: 0 0 110px; font-size: 0.8rem; font-weight: 800; color: var(--accent); padding-top: 2px; }
+        .content { flex: 1; font-weight: 500; white-space: pre-wrap; font-size: 1rem; color: #222; }
+
+        .info-item { display: flex; margin-bottom: 22px; align-items: flex-start; }
+
+        /* オーディオプレイヤーのスタイル */
+        .audio-container {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f1f5f9;
+            border-radius: var(--radius-sm);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .audio-player {
+            width: 100%;
+            height: 40px;
+            outline: none;
+        }
+
+        #modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 3000; justify-content: center; align-items: center;
+            backdrop-filter: blur(8px);
+        }
+        .modal-content { 
+            background: white; 
+            padding: 45px 35px; 
+            border-radius: var(--radius-lg); 
+            width: 320px; 
+            text-align: center;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.3);
+        }
+        .modal-content input { 
+            width: 100%; 
+            padding: 16px; 
+            margin: 20px 0; 
+            border: 2px solid #f0f0f0; 
+            border-radius: var(--radius-sm); 
+            box-sizing: border-box;
+            outline: none;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+        .modal-content input:focus { border-color: var(--accent); background: #f8fbff; }
+        .modal-content button { 
+            width: 100%; 
+            padding: 16px; 
+            background: var(--text-main); 
+            color: white; 
+            border: none; 
+            border-radius: var(--radius-sm); 
+            font-weight: bold; 
+            cursor: pointer;
+            margin-bottom: 12px;
+            font-size: 1rem;
+            transition: opacity 0.2s;
+        }
+        .modal-content button:active { opacity: 0.8; }
+
+        @media (max-width: 600px) { 
+            .info-item { flex-direction: column; gap: 6px; } 
+            body { padding-top: 180px; }
+            #meta-info { top: 90px; right: 15px; left: 15px; flex-direction: row; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+            header { margin-top: 50px; }
+            #emergency-alert { font-size: 1rem; padding: 12px 15px; }
+        }
+    </style>
+</head>
+<body>
+
+<div id="emergency-alert">【緊急】メッセージ読み込み中...</div>
+
+<div id="meta-info">
+    <div id="status">Connecting</div>
+    <div id="last-updated"></div>
+    <a href="https://airnote123.github.io/tokei/" target="_blank" class="external-link">
+        🕒 時計を開く
+    </a>
+    <a href="https://airnote123.github.io/doraibu" target="_blank" class="external-link drive-link">
+        📁 ドライブを開く
+    </a>
+</div>
+
+<header><h1>共有中の最新データ</h1></header>
+
+<div id="note-container">
+    <span class="note-label">UPDATE / NOTE</span>
+    <div id="note"></div>
+</div>
+
+<div id="list"></div>
+
+<div id="modal-overlay">
+    <div class="modal-content">
+        <div style="font-weight: 900; font-size: 1.3rem; margin-bottom: 12px;">Admin Access</div>
+        <div style="font-size: 0.85rem; color: #888;">管理用パスワードを入力してください</div>
+        <input type="password" id="admin-password" placeholder="パスワードを入力">
+        <button id="admin-submit">Export JSON</button>
+        <button onclick="document.getElementById('modal-overlay').style.display='none'" style="background:none; color:#aaa; font-size: 0.95rem; border:none; cursor:pointer;">Cancel</button>
+    </div>
+</div>
+
+<script>
+(function() {
+    let currentContentData = null;
+    let tapCount = 0;
+    let tapTimer = null;
+
+    const statusEl = document.getElementById("status");
+    const updatedEl = document.getElementById("last-updated");
+    const alertBox = document.getElementById("emergency-alert");
+    const listEl = document.getElementById("list");
+    const noteEl = document.getElementById("note");
+    const noteContainer = document.getElementById("note-container");
+    const modal = document.getElementById("modal-overlay");
+    const passwordInput = document.getElementById("admin-password");
+
+    const SUPABASE_URL = "https://qfzyrogwyjbzbblnvqzy.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_tXLLvKe_L-27OsGU-GH3Zw_176oxBqw";
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 5回タップで管理モーダルを表示する処理
+    statusEl.onclick = () => {
+        tapCount++;
+        clearTimeout(tapTimer);
+        tapTimer = setTimeout(() => tapCount = 0, 2000);
+        if (tapCount >= 5) { 
+            tapCount = 0;
+            modal.style.display = "flex"; 
+            passwordInput.value = ""; 
+            passwordInput.focus(); 
+        }
+    };
+
+    document.getElementById("admin-submit").onclick = () => {
+        if (passwordInput.value === "hoso2026admin") {
+            const el = document.createElement('textarea');
+            el.value = JSON.stringify(currentContentData, null, 2);
+            document.body.appendChild(el); 
+            el.select(); 
+            document.execCommand('copy'); 
+            document.body.removeChild(el);
+            alert("JSONをコピーしました"); 
+            modal.style.display = "none";
+        } else { 
+            alert("Incorrect password"); 
+        }
+    };
+
+    function render(data) {
+        if (!data || data.length === 0) return;
+        const row = data[0];
+
+        if (row.alert && row.alert.trim() !== "" && row.alert !== "なし") {
+            alertBox.innerText = `🚨 ${row.alert}`;
+            alertBox.style.display = "block";
+            document.body.style.paddingTop = (alertBox.offsetHeight + 25) + "px";
+        } else {
+            alertBox.style.display = "none";
+            document.body.style.paddingTop = "20px";
+        }
+
+        const date = new Date(row.updated_at || row.created_at);
+        updatedEl.innerText = `${date.getMonth()+1}/${date.getDate()} ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')} 更新`;
+
+        if (row.note && row.note.trim() !== "" && row.note !== "なし") {
+            noteEl.innerText = row.note;
+            noteContainer.style.display = "block";
+        } else {
+            noteContainer.style.display = "none";
+        }
+
+        try {
+            const episodes = typeof row.content === 'string' ? JSON.parse(row.content) : row.content;
+            
+            // ポーリングで再生中の音がリセットされないよう、データが完全に一致している場合は再描画をスキップ
+            if (JSON.stringify(currentContentData) === JSON.stringify(episodes)) {
+                return;
+            }
+            currentContentData = episodes;
+
+            listEl.innerHTML = episodes.map(ep => {
+                // キー名を「url」に変更
+                const audioHTML = (ep.url && ep.url.trim() !== "") 
+                    ? `
+                        <div class="audio-container">
+                            <span class="label" style="padding-bottom:4px;">【録音データ】</span>
+                            <audio src="${ep.url}" controls class="audio-player" preload="metadata"></audio>
+                        </div>
+                    ` 
+                    : "";
+
+                return `
+                    <div class="episode-card">
+                        <div class="episode-header">
+                            <span class="episode-number">放送番号：${ep.number || "-"}</span>
+                            <span class="episode-date">${ep.date || "-"}</span>
+                        </div>
+                        <div class="info-item"><span class="label">【OP】</span><span class="content">${ep.opening || ""}</span></div>
+                        <div class="info-item"><span class="label">【企画】</span><span class="content">${ep.trivia || ""}</span></div>
+                        <div class="info-item"><span class="label">【ED】</span><span class="content">${ep.ending || ""}</span></div>
+                        ${audioHTML}
+                    </div>
+                `;
+            }).join('');
+        } catch (e) { 
+            console.error("Content Parse Error:", e); 
+        }
+    }
+
+    async function loadData() {
+        try {
+            const { data, error } = await supabase.from("broadcasts").select("*").order("created_at", { ascending: false }).limit(1);
+            if (!error) { 
+                render(data); 
+                statusEl.innerText = "Synced"; 
+                statusEl.style.backgroundColor = "#ecfdf5";
+                statusEl.style.color = "#10b981";
+            } else {
+                throw error;
+            }
+        } catch (err) {
+            console.error("Load Error:", err);
+            statusEl.innerText = "Error";
+            statusEl.style.backgroundColor = "#fee2e2";
+            statusEl.style.color = "#dc2626";
+        }
+    }
+
+    setInterval(loadData, 2000);
+    loadData();
+})();
+</script>
+</body>
+</html>
